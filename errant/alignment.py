@@ -1,7 +1,18 @@
 from itertools import groupby
-import Levenshtein
+import edit_distance
 import spacy.parts_of_speech as POS
 from errant.edit import Edit
+
+
+# Get rid of Levenshtein c-extension to make this run on puhti
+def lev_ratio(a, b):
+    sm = edit_distance.SequenceMatcher(a=a, b=b)
+    codes = [c for c in sm.get_opcodes() if c[0] != 'equal']
+    ldist = sum([2 for item in codes if item[0] == 'replace']) + \
+            sum([1 for item in codes if item[0] != 'replace'])
+    ln = len(a) + len(b)
+    return (ln - ldist)/ln
+
 
 class Alignment:
     # Protected class resource
@@ -37,7 +48,7 @@ class Alignment:
             op_matrix[i][0] = "D"
         for j in range(1, c_len+1):
             cost_matrix[0][j] = cost_matrix[0][j-1] + 1
-            op_matrix[0][j] = "I"
+            op_matrix[0][j] = "I"s
 
         # Loop through the cost_matrix
         for i in range(o_len):
@@ -94,7 +105,7 @@ class Alignment:
         elif o.pos in self._open_pos and c.pos in self._open_pos: pos_cost = 0.25
         else: pos_cost = 0.5
         # Char cost
-        char_cost = 1-Levenshtein.ratio(o.text, c.text)
+        char_cost = 1 - lev_ratio(o.text, c.text)
         # Combine the costs
         return lemma_cost + pos_cost + char_cost
 
@@ -136,14 +147,14 @@ class Alignment:
     def get_all_split_edits(self):
         edits = []
         for align in self.align_seq:
-            if align[0] != "M": 
+            if align[0] != "M":
                 edits.append(Edit(self.orig, self.cor, align[1:]))
         return edits
 
     # all-merge: Merge all adjacent non-match ops
     def get_all_merge_edits(self):
         edits = []
-        for op, group in groupby(self.align_seq, 
+        for op, group in groupby(self.align_seq,
                 lambda x: True if x[0] == "M" else False):
             if not op:
                 merged = self.merge_edits(list(group))

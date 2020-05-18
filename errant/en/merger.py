@@ -1,19 +1,30 @@
 from itertools import combinations, groupby
 from re import sub
 from string import punctuation
-import Levenshtein
+import edit_distance
 import spacy.symbols as POS
 from errant.edit import Edit
 
 # Merger resources
 open_pos = {POS.ADJ, POS.AUX, POS.ADV, POS.NOUN, POS.VERB}
 
+
+# Get rid of Levenshtein c-extension to make this run on puhti
+def lev_ratio(a, b):
+    sm = edit_distance.SequenceMatcher(a=a, b=b)
+    codes = [c for c in sm.get_opcodes() if c[0] != 'equal']
+    ldist = sum([2 for item in codes if item[0] == 'replace']) + \
+            sum([1 for item in codes if item[0] != 'replace'])
+    ln = len(a) + len(b)
+    return (ln - ldist)/ln
+
+
 # Input: An Alignment object
 # Output: A list of Edit objects
 def get_rule_edits(alignment):
     edits = []
     # Split alignment into groups of M, T and rest. (T has a number after it)
-    for op, group in groupby(alignment.align_seq, 
+    for op, group in groupby(alignment.align_seq,
             lambda x: x[0][0] if x[0][0] in {"M", "T"} else False):
         group = list(group)
         # Ignore M
@@ -26,7 +37,7 @@ def get_rule_edits(alignment):
         else:
             processed = process_seq(group, alignment)
             # Turn the processed sequence into edits
-            for seq in processed: 
+            for seq in processed:
                 edits.append(Edit(alignment.orig, alignment.cor, seq[1:]))
     return edits
 
@@ -114,8 +125,8 @@ def is_punct(token):
 
 # Calculate the cost of character alignment; i.e. char similarity
 def char_cost(a, b):
-    return Levenshtein.ratio(a.text, b.text)
-    
+    return lev_ratio(a.text, b.text)
+
 # Merge the input alignment sequence to a single edit span
 def merge_edits(seq):
     if seq: return [("X", seq[0][1], seq[-1][2], seq[0][3], seq[-1][4])]

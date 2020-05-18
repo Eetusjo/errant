@@ -1,8 +1,19 @@
 from pathlib import Path
-import Levenshtein
+import edit_distance
 from nltk.stem import LancasterStemmer
 import spacy
 import spacy.symbols as POS
+
+
+# Get rid of Levenshtein c-extension to make this run on puhti
+def lev_ratio(a, b):
+    sm = edit_distance.SequenceMatcher(a=a, b=b)
+    codes = [c for c in sm.get_opcodes() if c[0] != 'equal']
+    ldist = sum([2 for item in codes if item[0] == 'replace']) + \
+            sum([1 for item in codes if item[0] != 'replace'])
+    ln = len(a) + len(b)
+    return (ln - ldist)/ln
+
 
 # Load Hunspell word list
 def load_word_list(path):
@@ -46,7 +57,7 @@ stemmer = LancasterStemmer()
 spell = load_word_list(base_dir/"resources"/"en_GB-large.txt")
 # Part of speech map file
 pos_map = load_pos_map(base_dir/"resources"/"en-ptb_map")
-# Open class coarse Spacy POS tags 
+# Open class coarse Spacy POS tags
 open_pos1 = {POS.ADJ, POS.ADV, POS.NOUN, POS.VERB}
 # Open class coarse Spacy POS tags (strings)
 open_pos2 = {"ADJ", "ADV", "NOUN", "VERB"}
@@ -61,7 +72,7 @@ dep_map = {
     "acomp": "ADJ",
     "amod": "ADJ",
     "advmod": "ADV",
-    "det": "DET", 
+    "det": "DET",
     "prep": "PREP",
     "prt": "PART",
     "punct": "PUNCT"}
@@ -213,7 +224,7 @@ def get_two_sided_type(o_toks, c_toks):
                         return "MORPH"
                 # Use string similarity to detect true spelling errors.
                 else:
-                    char_ratio = Levenshtein.ratio(o_toks[0].text, c_toks[0].text)
+                    char_ratio = lev_ratio(o_toks[0].text, c_toks[0].text)
                     # Ratio > 0.5 means both side share at least half the same chars.
                     # WARNING: THIS IS AN APPROXIMATION.
                     if char_ratio > 0.5:
@@ -317,7 +328,7 @@ def get_two_sided_type(o_toks, c_toks):
         return "VERB:TENSE"
     # All same POS
     if len(set(o_pos+c_pos)) == 1:
-        # Final verbs with the same lemma are tense; e.g. eat -> has eaten 
+        # Final verbs with the same lemma are tense; e.g. eat -> has eaten
         if o_pos[0] == "VERB" and \
                 o_toks[-1].lemma == c_toks[-1].lemma:
             return "VERB:TENSE"
@@ -372,7 +383,7 @@ def exact_reordering(o_toks, c_toks):
         return True
     return False
 
-# Input 1: An original text spacy token. 
+# Input 1: An original text spacy token.
 # Input 2: A corrected text spacy token.
 # Output: Boolean; both tokens have a dependant auxiliary verb.
 def preceded_by_aux(o_tok, c_tok):
