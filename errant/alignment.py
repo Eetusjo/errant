@@ -48,7 +48,7 @@ class Alignment:
             op_matrix[i][0] = "D"
         for j in range(1, c_len+1):
             cost_matrix[0][j] = cost_matrix[0][j-1] + 1
-            op_matrix[0][j] = "I"s
+            op_matrix[0][j] = "I"
 
         # Loop through the cost_matrix
         for i in range(o_len):
